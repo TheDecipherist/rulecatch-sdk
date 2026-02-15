@@ -36,6 +36,7 @@ const EXEMPT_COMMANDS = new Set(['init', 'help', '--help', '-h', 'uninstall', 'r
 /**
  * Validate that config exists with a valid API key.
  * Exits with a clear error if not configured.
+ * Monitor-only mode (monitorOnly: true) is allowed without an API key.
  */
 function requireConfig(): void {
   if (EXEMPT_COMMANDS.has(command)) return;
@@ -47,6 +48,8 @@ function requireConfig(): void {
 
   try {
     const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+    // Monitor-only mode doesn't need an API key
+    if (config.monitorOnly === true) return;
     if (!config.apiKey || typeof config.apiKey !== 'string' || !config.apiKey.startsWith('dc_')) {
       console.error(`\x1b[31m\nInvalid API key in config.\x1b[0m Run \x1b[1mnpx @rulecatch/ai-pooler init\x1b[0m to reconfigure.\n`);
       process.exit(1);
@@ -146,7 +149,11 @@ async function main() {
         try {
           const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
           console.log(`Config:        ${green('+ Found')}`);
-          console.log(`  API key:     ${dim(config.apiKey?.slice(0, 8) + '...')}`);
+          if (config.monitorOnly) {
+            console.log(`  Mode:        ${yellow('Monitor only (no API key)')}`);
+          } else {
+            console.log(`  API key:     ${dim(config.apiKey?.slice(0, 8) + '...')}`);
+          }
           console.log(`  Region:      ${dim(config.region === 'eu' ? 'EU (Frankfurt)' : 'US (Virginia)')}`);
           console.log(`  Batch size:  ${dim(String(config.batchSize || 20))}`);
           console.log(`  Encrypted:   ${config.encryptionKey ? green('Yes') : yellow('No')}`);
@@ -228,6 +235,28 @@ async function main() {
     }
 
     case 'flush': {
+      // Check if monitor-only mode
+      let isMonitorOnly = false;
+      try {
+        const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+        isMonitorOnly = config.monitorOnly === true;
+      } catch { /* ignore */ }
+
+      if (isMonitorOnly) {
+        const bufferCount = getBufferCount();
+        console.log(`\n${bufferCount} events in buffer (monitor-only mode).`);
+
+        // In monitor mode, flush just deletes buffer files — no API call
+        if (fs.existsSync(FLUSH_SCRIPT)) {
+          try {
+            execSync(`node "${FLUSH_SCRIPT}" --force`, { stdio: 'inherit' });
+          } catch { /* ignore */ }
+        }
+        const remaining = getBufferCount();
+        console.log(green(`${bufferCount - remaining} events cleared (monitor-only — events not sent to API).\n`));
+        break;
+      }
+
       console.log('\nFlushing buffered events...\n');
 
       const bufferCount = getBufferCount();
