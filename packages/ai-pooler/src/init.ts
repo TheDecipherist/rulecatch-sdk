@@ -8,6 +8,10 @@ import { homedir } from 'os';
 import { join, dirname } from 'path';
 import { randomBytes } from 'crypto';
 import { createInterface } from 'readline';
+import { createRequire } from 'module';
+
+const _require = createRequire(import.meta.url);
+const PKG_VERSION: string = (_require('../package.json') as { version: string }).version;
 
 // Paths
 const CLAUDE_DIR = join(homedir(), '.claude');
@@ -106,7 +110,7 @@ async function validateApiKey(apiKey: string, region?: 'us' | 'eu'): Promise<Val
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify({ apiKey, clientVersion: PKG_VERSION }),
       });
 
       if (!response.ok) continue;

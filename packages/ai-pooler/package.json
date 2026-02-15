@@ -1,6 +1,6 @@
 {
   "name": "@rulecatch/ai-pooler",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Monitor and track AI coding activity in Claude Code — real-time analytics, token usage, cost tracking, rule enforcement. Zero overhead.",
   "type": "module",
   "main": "./dist/index.cjs",

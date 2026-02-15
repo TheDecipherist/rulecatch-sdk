@@ -20,6 +20,7 @@
 import { readFileSync, writeFileSync, readdirSync, unlinkSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { createRequire } from 'module';
 import { pbkdf2Sync } from 'crypto';
 import { encryptEventPII } from './crypto.js';
 import {
@@ -45,6 +46,10 @@ const PAUSED_FILE = join(RULECATCH_DIR, '.paused');
 
 // API version
 const API_VERSION = '/api/v1';
+
+// Package version (sent to API for tracking)
+const _require = createRequire(import.meta.url);
+const PKG_VERSION: string = (_require('../package.json') as { version: string }).version;
 
 interface Config {
   apiKey: string;
@@ -769,6 +774,7 @@ async function main(): Promise<void> {
             projectId: config.projectId,
             region: config.region,
             cliArgs: process.argv.slice(2),
+            clientVersion: PKG_VERSION,
           }),
           signal: AbortSignal.timeout(5000),
         });
