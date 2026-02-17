@@ -2,17 +2,20 @@
  * Rulecatch AI Pooler - Zero Token Overhead Tracking
  *
  * Commands:
- *   npx @rulecatch/ai-pooler init        - Interactive setup
- *   npx @rulecatch/ai-pooler uninstall   - Remove everything
- *   npx @rulecatch/ai-pooler status      - Check setup and buffer
- *   npx @rulecatch/ai-pooler check       - View recent violations
- *   npx @rulecatch/ai-pooler flush       - Force flush buffered events
- *   npx @rulecatch/ai-pooler logs        - Show flush activity logs
- *   npx @rulecatch/ai-pooler config      - Update configuration
- *   npx @rulecatch/ai-pooler monitor     - Live event stream (alias: live)
- *     -v / --verbose                     - Show file paths, git context
- *     -vv / --debug                      - Full JSON event dump
- *   npx @rulecatch/ai-pooler backpressure - Show backpressure status
+ *   npx @rulecatch/ai-pooler init            - Interactive setup
+ *   npx @rulecatch/ai-pooler uninstall       - Remove everything (alias: remove)
+ *   npx @rulecatch/ai-pooler status          - Check setup and buffer
+ *   npx @rulecatch/ai-pooler check           - View recent violations
+ *   npx @rulecatch/ai-pooler flush           - Force flush buffered events
+ *   npx @rulecatch/ai-pooler logs            - Show flush activity logs
+ *   npx @rulecatch/ai-pooler config          - Update configuration
+ *   npx @rulecatch/ai-pooler monitor         - Live event stream (alias: live)
+ *     -v / --verbose                         - Show file paths, git context
+ *     -vv / --debug                          - Full JSON event dump
+ *     --show-prompt                          - Include user prompt previews
+ *     --no-api-key                           - Force monitor-only mode
+ *   npx @rulecatch/ai-pooler backpressure    - Show backpressure status (alias: bp)
+ *   npx @rulecatch/ai-pooler reactivate      - Resume after subscription renewal
  */
 
 import { init, uninstall, findFlushScript, findFile } from './init.js';
@@ -729,7 +732,7 @@ async function main() {
           const res = await fetch(`${monEndpoint}/api/v1/ai/validate-key`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${monConfig.apiKey}` },
-            body: JSON.stringify({ apiKey: monConfig.apiKey }),
+            body: JSON.stringify({ apiKey: monConfig.apiKey, clientVersion: PKG_VERSION }),
             signal: AbortSignal.timeout(3000),
           });
           if (res.ok) {
@@ -826,7 +829,7 @@ async function main() {
           const res2 = await fetch(`${monEndpoint}/api/v1/ai/validate-key`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${monConfig.apiKey}` },
-            body: JSON.stringify({ apiKey: monConfig.apiKey }),
+            body: JSON.stringify({ apiKey: monConfig.apiKey, clientVersion: PKG_VERSION }),
             signal: AbortSignal.timeout(3000),
           });
           if (res2.ok) {
@@ -1067,7 +1070,7 @@ async function main() {
           const res = await fetch(`${monEndpoint}/api/v1/ai/validate-key`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${monConfig.apiKey}` },
-            body: JSON.stringify({ apiKey: monConfig.apiKey }),
+            body: JSON.stringify({ apiKey: monConfig.apiKey, clientVersion: PKG_VERSION }),
             signal: AbortSignal.timeout(3000),
           });
           // We can't easily poll violations from the API endpoint without the user's session
@@ -1263,41 +1266,55 @@ Usage:
 
 Commands:
   init         Interactive setup (API key, encryption, hooks)
-  uninstall    Remove all Rulecatch files and hooks
+  uninstall    Remove all Rulecatch files and hooks (alias: remove)
   status       Check setup, buffer count, session token
-  check        View recent rule violations (use --quiet --format summary for scripting)
+  check        View recent rule violations
   flush        Force send all buffered events
   logs         Show flush activity logs
   config       View or update configuration
-  monitor      Live event stream — watch events + flushes in real-time (alias: live)
-  backpressure Show detailed backpressure/throttling status (alias: bp)
-  reactivate   Resume data collection after subscription renewal
+  monitor      Live event stream (alias: live)
+  backpressure Show throttling status (alias: bp)
+  reactivate   Resume after subscription renewal
 
 Init Options:
-  --api-key=KEY        Your Rulecatch API key (starts with dc_)
-  --monitor-only       Skip API key — monitor mode only (no dashboard)
-  --region=us|eu       Override region (normally auto-detected)
-  --encryption-key=PWD Your encryption password (min 8 chars)
-  --batch-size=20      Events before auto-flush
+  --api-key=KEY           Your Rulecatch API key (starts with dc_)
+  --monitor-only          Monitor mode only — no account needed
+  --region=us|eu          Override region (normally auto-detected)
+  --encryption-key=PWD    Your encryption password (min 8 chars)
+  --project-id=NAME       Override auto-detected project name
+  --batch-size=20         Events before auto-flush
+
+Monitor Options:
+  -v, --verbose           Show file paths, git context, line changes
+  -vv, --debug            Full JSON event dump
+  --show-prompt           Include user prompt previews
+  --no-api-key            Force monitor-only mode (auto-inits if needed)
+
+Check Options:
+  --period=24h            Time window: 1h, 12h, 24h (default), 7d
+  --quiet                 Summary line only (for scripting)
+  --format=json           JSON output (default: summary)
 
 Config Options:
-  --batch-size=30      Change batch threshold
-  --region=us|eu       Change data region
+  --show-key              Display your encryption key
+  --batch-size=30         Change batch threshold
+  --region=us|eu          Change data region
 
 Log Options:
-  --lines=50           Number of log lines to show
-  --source=hook        Show hook log instead of flush log
+  --lines=50              Number of log lines to show (default: 30)
+  --source=hook           Show hook log instead of flush log
 
 Backpressure Options:
-  --reset=true         Reset backpressure state (clears backoff)
+  --reset=true            Reset backpressure state (clears backoff)
 
 Data Flow (Zero Token Overhead):
   Hook fires -> writes JSON to ~/.claude/rulecatch/buffer/
   Flush script -> encrypts PII -> sends batch to API
 
 Quick Start:
-  npx @rulecatch/ai-pooler init
-  # Follow interactive prompts, then restart Claude Code
+  npx @rulecatch/ai-pooler init          # Full setup (interactive)
+  npx @rulecatch/ai-pooler init --monitor-only   # Free monitor mode
+  npx @rulecatch/ai-pooler monitor --no-api-key   # Quick monitor start
 
 Documentation: https://rulecatch.ai/docs
 `);
