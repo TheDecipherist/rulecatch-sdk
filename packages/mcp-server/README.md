@@ -4,7 +4,7 @@ MCP server for Rulecatch — query your rule violations, get fix plans, and revi
 
 Works with [Model Context Protocol](https://modelcontextprotocol.io) (MCP). Connects to your Rulecatch dashboard data and exposes it as tools that Claude can call during your coding sessions.
 
-**Requires a Pro or Enterprise plan.**
+**Requires a Pro or Enterprise plan.** Not available in monitor-only mode.
 
 ## Quick Start
 
@@ -31,7 +31,7 @@ Add to your Claude Code MCP settings (`~/.claude/mcp.json`):
 }
 ```
 
-That's it. Claude Code will now have access to 6 Rulecatch tools.
+That's it. Claude Code will now have access to Rulecatch tools.
 
 ## Tools
 
@@ -139,6 +139,23 @@ Get the most frequently violated rules, ranked by count.
 
 Returns: ranked list with violation counts, correction rates, percentage of total, and category breakdown.
 
+### `rulecatch_top_rules`
+
+Get the most frequently violated rules, ranked by count.
+
+```
+"Which rules am I breaking the most?"
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `period` | Time period (default: `7d`) |
+| `severity` | Filter by severity |
+| `category` | Filter by category |
+| `limit` | Max rules to return (default: 10, max: 25) |
+
+Returns: ranked list with violation counts, correction rates, percentage of total, and category breakdown.
+
 ## Architecture
 
 ```
@@ -169,7 +186,7 @@ mcp.rulecatch.ai ─── MongoDB Atlas
 |-------|-------|-----|
 | `Rulecatch not configured` | Missing config file | Run `npx @rulecatch/ai-pooler init` |
 | `Invalid API key` | API key doesn't match | Re-run `npx @rulecatch/ai-pooler init` |
-| `MCP tools require a Pro or Enterprise plan` | Starter plan | Upgrade at dashboard |
+| `MCP tools require a Pro or Enterprise plan` | Starter or monitor-only mode | Upgrade at dashboard |
 | `Rate limited` | Too many requests | Wait a moment, try again |
 | No tools appearing in Claude | MCP config not loaded | Restart Claude Code after editing `mcp.json` |
 

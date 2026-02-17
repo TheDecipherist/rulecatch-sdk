@@ -1,19 +1,16 @@
 # @rulecatch/ai-pooler
 
-AI development analytics for Claude Code, Cursor, and other AI coding assistants.
-
-Track your AI-assisted development sessions: tool usage, code changes, productivity patterns, and costs.
+AI development analytics for Claude Code — track sessions, tool usage, code changes, costs, and rule violations.
 
 **Privacy-first by design**: Zero-knowledge encryption means we literally cannot read your personal data.
 
 ## Quick Start
 
-```bash
-# Install globally
-npm install -g @rulecatch/ai-pooler
+### Full Mode (with account)
 
-# Set up automatic tracking (interactive)
-rulecatch init
+```bash
+# Install and set up (interactive)
+npx @rulecatch/ai-pooler init
 ```
 
 The interactive setup will:
@@ -22,7 +19,24 @@ The interactive setup will:
 3. Set up local encryption for PII
 4. Install hooks and configure everything
 
-That's it! All your Claude Code sessions will now be tracked automatically.
+That's it! Restart Claude Code and all sessions are tracked automatically.
+
+### Monitor-Only Mode (free, no account needed)
+
+```bash
+npx @rulecatch/ai-pooler init --monitor-only
+```
+
+Watch your AI coding activity in real-time without creating an account:
+- Live event stream in your terminal
+- Tool usage, token counts, cost estimates
+- No data sent to any server — everything stays local
+- Upgrade to full mode anytime with `npx @rulecatch/ai-pooler init --api-key=KEY`
+
+```bash
+# Start the live monitor
+npx @rulecatch/ai-pooler monitor
+```
 
 ## Configuration
 
@@ -34,39 +48,41 @@ All configuration is stored in `~/.claude/rulecatch/config.json`:
   "region": "us",
   "batchSize": 20,
   "salt": "...",
-  "encryptionKey": "..."
+  "encryptionKey": "...",
+  "monitorOnly": false
 }
 ```
 
 | Field | Description |
 |-------|-------------|
-| `apiKey` | Your API key from the Rulecatch™ dashboard |
+| `apiKey` | Your API key from the Rulecatch dashboard (empty in monitor-only mode) |
 | `region` | Data region: `us` (Virginia) or `eu` (Frankfurt) |
 | `batchSize` | Events per flush batch (default: 20) |
 | `salt` | Auto-generated salt for PII hashing |
 | `encryptionKey` | Your encryption password for PII |
+| `monitorOnly` | `true` for monitor-only mode (no API key required) |
 
 The config file is created automatically by `rulecatch init`. You should never need to edit it manually.
 
 ## Privacy & Security
 
-We take your privacy seriously. Rulecatch™ uses **zero-knowledge architecture** — we cannot read your personal data even if we wanted to.
+We take your privacy seriously. Rulecatch uses **zero-knowledge architecture** — we cannot read your personal data even if we wanted to.
 
 ### Zero-Knowledge Encryption
 
 During setup, you provide an encryption password. This password:
 - Is stored **only on your machine** (in the config file)
 - Encrypts all PII before it leaves your machine
-- Is never sent to Rulecatch™ servers
+- Is never sent to Rulecatch servers
 - Is needed in the dashboard to decrypt your own data
 
 ### What This Means
 
 | Data Type | What We Receive |
 |-----------|-----------------|
-| Email | `a7f3b2c1...` (SHA-256 hash) |
-| Git username | `e9d4f1a8...` (SHA-256 hash) |
-| File paths | `b2c3d4e5...` (SHA-256 hash) |
+| Email | `a7f3b2c1...` (encrypted) |
+| Git username | `e9d4f1a8...` (encrypted) |
+| File paths | `b2c3d4e5...` (encrypted) |
 | Tool calls | `Read`, `Edit`, `Bash` (unchanged) |
 | Token counts | `15,234` (unchanged) |
 
@@ -84,10 +100,10 @@ Via Claude Code hooks, we automatically capture:
 
 - **Session start/end** — When you begin and end coding sessions
 - **Tool calls** — Every Read, Write, Edit, Bash, Glob, Grep call (name, success/failure)
-- **File paths** — Which files tools operate on (hashed before sending)
+- **File paths** — Which files tools operate on (encrypted before sending)
 - **Languages used** — Inferred from file extensions (TypeScript, Python, etc.)
 - **Lines changed** — Actual `git diff` stats captured incrementally
-- **Files modified** — List of changed files from git (hashed before sending)
+- **Files modified** — List of changed files from git (encrypted before sending)
 - **Git context** — Repository, branch, commit, dirty state
 - **Turn completions** — When Claude finishes responding
 - **Token usage** — Input/output tokens (calculated from Claude's stats)
@@ -103,22 +119,39 @@ Via Claude Code hooks, we automatically capture:
 ## Commands
 
 ```bash
-# Interactive setup (run once)
-rulecatch init
+# Setup
+rulecatch init                      # Interactive setup (full mode)
+rulecatch init --monitor-only       # Monitor mode (no account needed)
+rulecatch init --api-key=KEY        # Non-interactive with API key
 
-# Check setup status
-rulecatch status
+# Live Monitoring
+rulecatch monitor                   # Real-time event stream
+rulecatch monitor -v                # Verbose (file paths, git context)
+rulecatch monitor -vv               # Debug (full JSON dump)
 
-# Send test event
-rulecatch test
+# Status & Diagnostics
+rulecatch status                    # Check setup health
+rulecatch check                     # View recent rule violations (last 24h)
+rulecatch check --period=7d         # Violations over last 7 days
+rulecatch check --quiet             # Script-friendly output
 
-# View recent activity
-rulecatch logs
+# Configuration
+rulecatch config                    # View current config
+rulecatch config --show-key         # Display encryption key
+rulecatch config --region=eu        # Change data region
 
-# Remove tracking
-rulecatch uninstall
+# Maintenance
+rulecatch flush                     # Force send buffered events
+rulecatch logs                      # Show flush activity
+rulecatch logs --source=hook        # Show hook activity
+rulecatch backpressure              # Show throttling status
+rulecatch backpressure --reset=true # Reset backoff state
+rulecatch reactivate                # Resume after subscription renewal
 
-# Show help
+# Cleanup
+rulecatch uninstall                 # Remove everything
+
+# Help
 rulecatch help
 ```
 
@@ -130,7 +163,7 @@ rulecatch help
 |                                                |
 |  Claude Code -> Hook fires -> Privacy check    |
 |                      |                         |
-|          PII hashed locally (SHA-256)          |
+|          PII encrypted locally (AES-256-GCM)   |
 |                      |                         |
 |     Region check -> Route to US or EU API      |
 +-----------------------------------------------+
@@ -141,7 +174,7 @@ rulecatch help
 |  US API (Virginia) |   |  EU API (Frankfurt)|
 |                    |   |                    |
 |  We receive:       |   |  We receive:       |
-|  - Hashed PII      |   |  - Hashed PII      |
+|  - Encrypted PII   |   |  - Encrypted PII   |
 |  - Plain metrics   |   |  - Plain metrics   |
 |                    |   |                    |
 |  We CANNOT see:    |   |  We CANNOT see:    |
@@ -156,7 +189,7 @@ rulecatch help
 - **Dashboard**: https://dashboard.rulecatch.ai?utm_source=npm&utm_medium=readme&utm_campaign=ai-pooler&utm_content=links
 - **Documentation**: https://rulecatch.ai/docs?utm_source=npm&utm_medium=readme&utm_campaign=ai-pooler&utm_content=links
 - **Privacy Policy**: https://rulecatch.ai/privacy?utm_source=npm&utm_medium=readme&utm_campaign=ai-pooler&utm_content=links
-- **GitHub**: https://github.com/TheDecipherist/rulecatch
+- **GitHub**: https://github.com/TheDecipherist/rulecatch-sdk
 
 ## License
 

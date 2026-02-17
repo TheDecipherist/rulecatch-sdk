@@ -126,7 +126,7 @@ async function validateApiKey(apiKey: string, region?: 'us' | 'eu'): Promise<Val
   return { valid: false };
 }
 
-function findFile(filename: string): string | null {
+export function findFile(filename: string): string | null {
   const base = dirname(new URL(import.meta.url).pathname);
   const candidates = [
     join(base, '..', 'templates', filename),
@@ -140,7 +140,7 @@ function findFile(filename: string): string | null {
   return null;
 }
 
-function findFlushScript(): string | null {
+export function findFlushScript(): string | null {
   const base = dirname(new URL(import.meta.url).pathname);
   const candidates = [
     join(base, 'flush.js'),
@@ -297,6 +297,9 @@ export async function init(options: InitOptions = {}): Promise<void> {
     registerHooks(false);
     console.log(green('+ Hooks registered in ~/.claude/settings.json'));
 
+    // Write hook version marker for auto-update detection
+    writeFileSync(join(RULECATCH_DIR, '.hook-version'), PKG_VERSION);
+
     console.log(green('\n+ Monitor mode enabled!') + ' Hooks activate on your next Claude Code session.');
     console.log('  Run `npx @rulecatch/ai-pooler monitor` to see live AI activity.');
     console.log('  If Claude is running now, type /exit and reopen to activate.\n');
@@ -426,6 +429,9 @@ export async function init(options: InitOptions = {}): Promise<void> {
   if (mcpServerSource) {
     console.log(green('+ MCP server registered in ~/.claude/settings.json'));
   }
+
+  // Write hook version marker for auto-update detection
+  writeFileSync(join(RULECATCH_DIR, '.hook-version'), PKG_VERSION);
 
   console.log(green('\n+ Setup complete!') + ' Hooks activate on your next Claude Code session.');
   console.log('  If Claude is running now, type /exit and reopen to activate.\n');

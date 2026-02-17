@@ -12,6 +12,10 @@ import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
+// Package version — injected at build time by rollup @rollup/plugin-replace
+declare const __FLUSH_PKG_VERSION__: string;
+const PKG_VERSION: string = typeof __FLUSH_PKG_VERSION__ !== 'undefined' ? __FLUSH_PKG_VERSION__ : 'unknown';
+
 // Paths
 const RULECATCH_DIR = join(homedir(), '.claude', 'rulecatch');
 const BACKPRESSURE_STATE_FILE = join(RULECATCH_DIR, '.backpressure-state');
@@ -205,7 +209,8 @@ export async function getServerCapacity(
       headers,
       body: JSON.stringify({
         pendingEventCount: pendingCount,
-        clientVersion: '0.4.0',
+        clientVersion: PKG_VERSION,
+        cliArgs: process.argv.slice(2),
       }),
       signal: AbortSignal.timeout(10000), // 10s timeout
     });

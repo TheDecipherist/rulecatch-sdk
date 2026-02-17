@@ -1,6 +1,10 @@
 import typescript from '@rollup/plugin-typescript';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
+import replace from '@rollup/plugin-replace';
 import dts from 'rollup-plugin-dts';
+import { readFileSync } from 'fs';
+
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 const external = [
   '@rulecatch/core',
@@ -67,6 +71,10 @@ export default [
       banner: '#!/usr/bin/env node',
     },
     plugins: [
+      replace({
+        preventAssignment: true,
+        __FLUSH_PKG_VERSION__: JSON.stringify(pkg.version),
+      }),
       nodeResolve(),
       typescript({
         tsconfig: './tsconfig.json',

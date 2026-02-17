@@ -15,7 +15,7 @@
  *   npx @rulecatch/ai-pooler backpressure - Show backpressure status
  */
 
-import { init, uninstall } from './init.js';
+import { init, uninstall, findFlushScript, findFile } from './init.js';
 import { loadState, getStatusSummary } from './backpressure.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -81,6 +81,59 @@ const SETTINGS_PATH = path.join(CLAUDE_DIR, 'settings.json');
 const BACKPRESSURE_STATE_FILE = path.join(RULECATCH_DIR, '.backpressure-state');
 const PAUSED_FILE = path.join(RULECATCH_DIR, '.paused');
 
+const HOOK_VERSION_FILE = path.join(RULECATCH_DIR, '.hook-version');
+
+/**
+ * Auto-update hooks if the installed version differs from the running CLI version.
+ * Runs silently before command dispatch so every `npx @rulecatch/ai-pooler@latest` keeps hooks current.
+ */
+function autoUpdateHooks(): void {
+  // Only update if hooks are already installed (user ran init before)
+  if (!fs.existsSync(HOOK_SCRIPT) && !fs.existsSync(FLUSH_SCRIPT)) return;
+
+  // Compare installed hook version with current CLI version
+  let installedVersion = '';
+  try {
+    if (fs.existsSync(HOOK_VERSION_FILE)) {
+      installedVersion = fs.readFileSync(HOOK_VERSION_FILE, 'utf-8').trim();
+    }
+  } catch { /* treat as missing */ }
+
+  if (installedVersion === PKG_VERSION) return;
+
+  // Version mismatch — update hooks
+  let updated = false;
+
+  // Update flush script
+  const flushSource = findFlushScript();
+  if (flushSource) {
+    try {
+      fs.copyFileSync(flushSource, FLUSH_SCRIPT);
+      fs.chmodSync(FLUSH_SCRIPT, 0o755);
+      updated = true;
+    } catch { /* silent */ }
+  }
+
+  // Update hook script from template
+  const hookTemplate = findFile('rulecatch-track.sh');
+  if (hookTemplate) {
+    try {
+      fs.copyFileSync(hookTemplate, HOOK_SCRIPT);
+      fs.chmodSync(HOOK_SCRIPT, 0o755);
+      updated = true;
+    } catch { /* silent */ }
+  }
+
+  if (updated) {
+    // Write new version marker
+    try {
+      fs.mkdirSync(RULECATCH_DIR, { recursive: true });
+      fs.writeFileSync(HOOK_VERSION_FILE, PKG_VERSION);
+    } catch { /* silent */ }
+    console.log(`\x1b[32m✓ Hooks updated to v${PKG_VERSION}\x1b[0m`);
+  }
+}
+
 function parseArgs(): Record<string, string> {
   const result: Record<string, string> = {};
   for (const arg of args) {
@@ -104,6 +157,7 @@ function getBufferCount(): number {
 }
 
 async function main() {
+  autoUpdateHooks();
   requireConfig();
 
   switch (command) {
