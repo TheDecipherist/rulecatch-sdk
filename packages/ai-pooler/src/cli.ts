@@ -710,7 +710,7 @@ async function main() {
           const res = await fetch(`${monEndpoint}/api/v1/ai/monitor-ping`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ monitorOnly: true, projectId: monConfig.projectId, region: monConfig.region, cliArgs: process.argv.slice(2) }),
+            body: JSON.stringify({ monitorOnly: true, projectId: monConfig.projectId, region: monConfig.region, cliArgs: process.argv.slice(2), source: 'monitor', version: PKG_VERSION }),
             signal: AbortSignal.timeout(3000),
           });
           if (res.ok) {
@@ -959,7 +959,7 @@ async function main() {
             if (evtCwd || repo) {
               let projLine = evtCwd ? `         ${dim('project:')} ${blue(evtCwd)}` : '        ';
               if (repo) {
-                projLine += `  ${dim('repo:')} ${repo} ${branch}`;
+                projLine += `\n         ${dim('repo:')} ${repo} ${branch}`;
               } else if (evt.gitBranch || evt.gitCommit) {
                 const gb = evt.gitBranch ? cyan(evt.gitBranch as string) : '';
                 const gc = evt.gitCommit ? dim(evt.gitCommit as string) : '';
@@ -983,7 +983,7 @@ async function main() {
             const gitRepo = demoMode ? DEMO_REPO : evt.gitRepo as string;
             if (gitRepo) {
               const gitBranch = evt.gitBranch ? dim(`(${evt.gitBranch as string})`) : '';
-              projLine += `  ${dim('repo:')} ${blue(gitRepo)} ${gitBranch}`;
+              projLine += `\n         ${dim('repo:')} ${blue(gitRepo)} ${gitBranch}`;
             } else if (evt.gitBranch || evt.gitCommit) {
               const gb = evt.gitBranch ? cyan(evt.gitBranch as string) : '';
               const gc = evt.gitCommit ? dim(evt.gitCommit as string) : '';
@@ -1326,6 +1326,32 @@ Documentation: https://rulecatch.ai/docs
         console.log(red(`\nUnknown command: ${command}`));
       }
       console.log('Run `npx @rulecatch/ai-pooler help` for usage.\n');
+
+      // Fire-and-forget ping so we know someone tried to run the CLI
+      try {
+        let pingEndpoint = 'https://api.rulecatch.ai';
+        let pingRegion: string | null = null;
+        let pingProjectId: string | null = null;
+        if (fs.existsSync(CONFIG_PATH)) {
+          const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+          pingEndpoint = cfg.endpoint || (cfg.region === 'eu' ? 'https://api-eu.rulecatch.ai' : 'https://api.rulecatch.ai');
+          pingRegion = cfg.region || null;
+          pingProjectId = cfg.projectId || null;
+        }
+        fetch(`${pingEndpoint}/api/v1/ai/monitor-ping`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            monitorOnly: true,
+            projectId: pingProjectId,
+            region: pingRegion,
+            cliArgs: command ? [command] : [],
+            source: command ? 'unknown_command' : 'no_args',
+            version: PKG_VERSION,
+          }),
+          signal: AbortSignal.timeout(3000),
+        }).catch(() => {});
+      } catch { /* never block */ }
     }
   }
 }
