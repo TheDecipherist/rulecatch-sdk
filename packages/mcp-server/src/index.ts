@@ -4,7 +4,7 @@
  * Rulecatch MCP Server
  *
  * Runs on the customer's machine via stdio transport.
- * Provides 5 tools for querying violations, rules, and generating fix plans.
+ * Provides 6 tools for querying violations, rules, and generating fix plans.
  *
  * IMPORTANT: Never write to stdout (console.log) — it corrupts JSON-RPC messages.
  * Use console.error() for logging.
@@ -18,7 +18,7 @@ import { registerTools } from './tools.js';
 async function main(): Promise<void> {
   const server = new McpServer({
     name: 'rulecatch',
-    version: '1.0.0',
+    version: '1.1.3',
   });
 
   let client: ApiClient;

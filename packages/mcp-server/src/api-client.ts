@@ -69,14 +69,21 @@ export class ApiClient {
 
     let response: Response;
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       response = await fetch(url.toString(), {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           Accept: 'application/json',
         },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
     } catch (err) {
+      if ((err as Error).name === 'AbortError') {
+        throw new Error('Rulecatch API request timed out (15s). Try again.');
+      }
       throw new Error(
         'Cannot reach Rulecatch API. Check your internet connection.'
       );
