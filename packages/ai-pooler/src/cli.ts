@@ -20,6 +20,7 @@
 
 import { init, uninstall, findFlushScript, findFile } from './init.js';
 import { loadState, getStatusSummary } from './backpressure.js';
+import { formatContextBar, getContextWindowSize, fmtTokens as fmtCtxTokens } from './context-usage.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -703,6 +704,7 @@ async function main() {
       let planInfo = '';
       let usageInfo = '';
       let modelInfo = '';
+      let contextWindowSize = 200000; // default, updated when model detected
 
       if (isMonitorOnly) {
         // Monitor-only mode: ping the gate endpoint instead of validate-key
@@ -759,6 +761,7 @@ async function main() {
               // Pretty-print model name: "claude-opus-4-6" → "Claude Opus 4.6"
               const pretty = model.replace('claude-', '').replace(/-(\d+)-(\d+)/, ' $1.$2').replace(/\b\w/g, c => c.toUpperCase());
               modelInfo = magenta(pretty);
+              contextWindowSize = getContextWindowSize(model);
             }
           } else if (res.status === 401) {
             apiStatus = yellow('⚠️  Invalid API key');
@@ -843,8 +846,18 @@ async function main() {
       let runningTokens = serverUsage.totalTokens;
       let runningCost = serverUsage.totalCost;
       const runningModel = modelInfo || dim('unknown');
+      // Latest context window usage from transcript
+      let latestContextUsage: { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number } | null = null;
 
       const fmtRunning = () => {
+        // Context bar from real transcript data
+        const ctxBar = formatContextBar(latestContextUsage, contextWindowSize);
+        const costPart = dim(`[${runningModel} │ $${runningCost.toFixed(2)}]`);
+        if (ctxBar) {
+          const colorFn = ctxBar.color === 'red' ? red : ctxBar.color === 'yellow' ? yellow : green;
+          return `${colorFn(ctxBar.bar)} ${costPart}`;
+        }
+        // Fallback: old format when no context data yet
         const tk = runningTokens > 1000000 ? `${(runningTokens / 1000000).toFixed(1)}M` : runningTokens > 1000 ? `${(runningTokens / 1000).toFixed(1)}K` : `${runningTokens}`;
         return dim(`[${runningModel} │ ${tk} tk │ $${runningCost.toFixed(2)}]`);
       };
@@ -886,6 +899,20 @@ async function main() {
       const fmtEvent = (evt: Record<string, unknown>) => {
         const time = fmtTime(evt.timestamp as string);
         const type = evt.type as string;
+
+        // Update context usage from transcript data (written by hook)
+        const ctxIn = evt.contextInputTokens as number | undefined;
+        if (ctxIn && ctxIn > 0) {
+          latestContextUsage = {
+            inputTokens: ctxIn,
+            outputTokens: (evt.contextOutputTokens as number) || 0,
+            cacheCreationTokens: (evt.contextCacheCreation as number) || 0,
+            cacheReadTokens: (evt.contextCacheRead as number) || 0,
+          };
+          // Update context window from event's model if available
+          const evtModel = evt.model as string;
+          if (evtModel) contextWindowSize = getContextWindowSize(evtModel);
+        }
 
         // Increment running counters from event data
         const evtInputTk = (evt.toolInputSize as number) || 0;

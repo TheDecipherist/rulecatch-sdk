@@ -31,10 +31,11 @@ FLUSH_SCRIPT="$HOME/.claude/hooks/rulecatch-flush.js"
 # Exit if not configured
 [ ! -f "$CONFIG_FILE" ] && exit 0
 
-# Exit if data collection is paused (subscription expired)
-# User must run `npx @rulecatch/ai-pooler reactivate` to resume
+# Check if data collection is paused (subscription expired)
+# When paused, we still log events locally (for monitor) but skip API sends
 PAUSED_FILE="$CONFIG_DIR/.paused"
-[ -f "$PAUSED_FILE" ] && exit 0
+IS_PAUSED=false
+[ -f "$PAUSED_FILE" ] && IS_PAUSED=true
 
 # Read config (single file read, multiple jq parses)
 CONFIG_DATA=$(cat "$CONFIG_FILE")
@@ -133,6 +134,7 @@ INPUT=$(cat)
 HOOK_EVENT=$(echo "$INPUT" | jq -r '.hook_event_name // empty')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
 # Capture git info (resolve CWD to git root + gather context in single check)
 log_debug "CWD=$CWD"
@@ -729,35 +731,72 @@ case "$HOOK_EVENT" in
 esac
 
 # ============================================================================
-# WRITE TO BUFFER FILE
+# CONTEXT USAGE — Parse transcript for real token counts
 # ============================================================================
 
-# Generate unique filename: timestamp-random.json
-TIMESTAMP=$(date +%s%N 2>/dev/null || date +%s)
-RANDOM_SUFFIX=$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')
-BUFFER_FILE="$BUFFER_DIR/${TIMESTAMP}-${RANDOM_SUFFIX}.json"
+CTX_INPUT_TOKENS=0
+CTX_OUTPUT_TOKENS=0
+CTX_CACHE_CREATION=0
+CTX_CACHE_READ=0
+CTX_WINDOW_SIZE=200000
 
-echo "$EVENT" > "$BUFFER_FILE"
+if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+  # Read last 20 lines, find most recent assistant message with usage
+  CTX_LINE=$(tail -20 "$TRANSCRIPT_PATH" | grep '"type":"assistant"' | grep '"usage"' | tail -1)
+  if [ -n "$CTX_LINE" ]; then
+    CTX_INPUT_TOKENS=$(echo "$CTX_LINE" | jq -r '.message.usage.input_tokens // 0' 2>/dev/null)
+    CTX_OUTPUT_TOKENS=$(echo "$CTX_LINE" | jq -r '.message.usage.output_tokens // 0' 2>/dev/null)
+    CTX_CACHE_CREATION=$(echo "$CTX_LINE" | jq -r '.message.usage.cache_creation_input_tokens // 0' 2>/dev/null)
+    CTX_CACHE_READ=$(echo "$CTX_LINE" | jq -r '.message.usage.cache_read_input_tokens // 0' 2>/dev/null)
+    log_debug "Context usage: in=$CTX_INPUT_TOKENS out=$CTX_OUTPUT_TOKENS cache_create=$CTX_CACHE_CREATION cache_read=$CTX_CACHE_READ"
+  fi
+fi
 
-# Append to event log for local monitor (JSONL — one compact JSON per line, append-only)
+# Merge context usage into event
+if [ "$CTX_INPUT_TOKENS" -gt 0 ] 2>/dev/null; then
+  EVENT=$(echo "$EVENT" | jq -c \
+    --argjson ctxIn "$CTX_INPUT_TOKENS" \
+    --argjson ctxOut "$CTX_OUTPUT_TOKENS" \
+    --argjson ctxCreate "$CTX_CACHE_CREATION" \
+    --argjson ctxRead "$CTX_CACHE_READ" \
+    --argjson ctxWindow "$CTX_WINDOW_SIZE" \
+    '. + {contextInputTokens: $ctxIn, contextOutputTokens: $ctxOut, contextCacheCreation: $ctxCreate, contextCacheRead: $ctxRead, contextWindowSize: $ctxWindow}')
+fi
+
+# ============================================================================
+# WRITE EVENT LOG (always — for local monitor)
+# ============================================================================
+
 EVENTS_LOG="$CONFIG_DIR/events.log"
 echo "$EVENT" | jq -c >> "$EVENTS_LOG"
 
-log_debug "Event type: $HOOK_EVENT -> $BUFFER_FILE"
-
 # ============================================================================
-# TRIGGER FLUSH
+# WRITE TO BUFFER + FLUSH (skip when paused — no API sends)
 # ============================================================================
 
-if [ "$HOOK_EVENT" == "SessionEnd" ] || [ "$HOOK_EVENT" == "Stop" ]; then
-  # Force flush on session end (synchronous)
-  if [ -f "$FLUSH_SCRIPT" ]; then
-    node "$FLUSH_SCRIPT" --force 2>/dev/null
-  fi
+if [ "$IS_PAUSED" == "true" ]; then
+  log_debug "Event type: $HOOK_EVENT (paused — logged locally, not buffered for API)"
 else
-  # Async flush attempt (non-blocking)
-  if [ -f "$FLUSH_SCRIPT" ]; then
-    node "$FLUSH_SCRIPT" 2>/dev/null &
+  # Generate unique filename: timestamp-random.json
+  TIMESTAMP=$(date +%s%N 2>/dev/null || date +%s)
+  RANDOM_SUFFIX=$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  BUFFER_FILE="$BUFFER_DIR/${TIMESTAMP}-${RANDOM_SUFFIX}.json"
+
+  echo "$EVENT" > "$BUFFER_FILE"
+
+  log_debug "Event type: $HOOK_EVENT -> $BUFFER_FILE"
+
+  # Trigger flush
+  if [ "$HOOK_EVENT" == "SessionEnd" ] || [ "$HOOK_EVENT" == "Stop" ]; then
+    # Force flush on session end (synchronous)
+    if [ -f "$FLUSH_SCRIPT" ]; then
+      node "$FLUSH_SCRIPT" --force 2>/dev/null
+    fi
+  else
+    # Async flush attempt (non-blocking)
+    if [ -f "$FLUSH_SCRIPT" ]; then
+      node "$FLUSH_SCRIPT" 2>/dev/null &
+    fi
   fi
 fi
 
