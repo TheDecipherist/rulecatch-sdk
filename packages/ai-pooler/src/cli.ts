@@ -909,9 +909,15 @@ async function main() {
             cacheCreationTokens: (evt.contextCacheCreation as number) || 0,
             cacheReadTokens: (evt.contextCacheRead as number) || 0,
           };
-          // Update context window from event's model if available
+          // Update context window and model info from event data
           const evtModel = evt.model as string;
-          if (evtModel) contextWindowSize = getContextWindowSize(evtModel);
+          if (evtModel) {
+            contextWindowSize = getContextWindowSize(evtModel);
+            if (!modelInfo) {
+              const pretty = evtModel.replace('claude-', '').replace(/-(\d+)-(\d+)/, ' $1.$2').replace(/\b\w/g, c => c.toUpperCase());
+              modelInfo = magenta(pretty);
+            }
+          }
         }
 
         // Increment running counters from event data
@@ -952,7 +958,14 @@ async function main() {
           const isWarning = evt.warning === true;
           const isSudo = evt.sudo === true;
           const ok = evt.toolSuccess ? green('✓') : red('✗');
-          const fp = (evt.filePath as string) || '';
+          let fp = (evt.filePath as string) || '';
+          // When privacy encrypts filePath, extract from toolInput JSON
+          if (!fp && evt.toolInput) {
+            try {
+              const ti = typeof evt.toolInput === 'string' ? JSON.parse(evt.toolInput) : evt.toolInput;
+              fp = ti.file_path || ti.path || ti.file || '';
+            } catch { /* not parseable */ }
+          }
           const opLabel = fileOp ? `(${fileOp})` : '';
           const dReason = (evt.destructiveReason as string) || '';
           const wReason = (evt.warningReason as string) || '';
