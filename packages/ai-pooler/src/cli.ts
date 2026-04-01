@@ -900,6 +900,16 @@ async function main() {
         const time = fmtTime(evt.timestamp as string);
         const type = evt.type as string;
 
+        // Update model info from event data
+        const evtModel = evt.model as string;
+        if (evtModel) {
+          contextWindowSize = getContextWindowSize(evtModel);
+          if (!modelInfo) {
+            const pretty = evtModel.replace('claude-', '').replace(/-(\d+)-(\d+)/, ' $1.$2').replace(/\b\w/g, c => c.toUpperCase());
+            modelInfo = magenta(pretty);
+          }
+        }
+
         // Update context usage from transcript data (written by hook)
         const ctxIn = evt.contextInputTokens as number | undefined;
         if (ctxIn && ctxIn > 0) {
@@ -909,15 +919,6 @@ async function main() {
             cacheCreationTokens: (evt.contextCacheCreation as number) || 0,
             cacheReadTokens: (evt.contextCacheRead as number) || 0,
           };
-          // Update context window and model info from event data
-          const evtModel = evt.model as string;
-          if (evtModel) {
-            contextWindowSize = getContextWindowSize(evtModel);
-            if (!modelInfo) {
-              const pretty = evtModel.replace('claude-', '').replace(/-(\d+)-(\d+)/, ' $1.$2').replace(/\b\w/g, c => c.toUpperCase());
-              modelInfo = magenta(pretty);
-            }
-          }
         }
 
         // Increment running counters from event data
