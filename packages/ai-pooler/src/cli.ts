@@ -1044,46 +1044,44 @@ async function main() {
           compactionStartTime = Date.now();
           const trigger = (evt.trigger as string) || 'auto';
           const triggerLabel = trigger === 'manual' ? yellow('/compact') : yellow('auto');
-          console.log(` ${time}  ${yellow('⟳')} ${yellow(bold('Compacting conversation...'))}  ${dim(`(${triggerLabel})`)}`);
+          console.log(` ${time}  ${yellow('⟳')} ${yellow(bold('Compacting conversation...'))}  ${dim(`(${triggerLabel})`)}  ${stats}`);
           if (debugMode && evt.customInstructions) {
             console.log(dim(`         instructions: ${evt.customInstructions}`));
           }
         } else if (type === 'turn_complete') {
           const turnLabel = turnHadToolCalls ? 'Turn complete' : 'Turn complete — text only (no tools)';
-          console.log(` ${time}  ${dim('↩')} ${dim(turnLabel)}`);
+          console.log(` ${time}  ${dim('↩')} ${dim(turnLabel)}  ${stats}`);
           turnHadToolCalls = false;
         } else if (type === 'user_prompt') {
           if (showPrompt) {
             const promptLen = (evt.promptLength as number) || 0;
             const promptPreview = ((evt.prompt as string) || '').slice(0, 80).replace(/\n/g, ' ');
-            console.log(` ${time}  ${cyan('⌨')} ${bold('Prompt')} ${dim(`(${promptLen} chars)`)} ${dim(promptPreview)}${promptLen > 80 ? dim('…') : ''}`);
+            console.log(` ${time}  ${cyan('⌨')} ${bold('Prompt')} ${dim(`(${promptLen} chars)`)} ${dim(promptPreview)}${promptLen > 80 ? dim('…') : ''}  ${stats}`);
           }
         } else if (type === 'pre_tool_use') {
           const tool = evt.toolName as string || '?';
-          if (verboseMode) {
-            console.log(` ${time}  ${dim('⏳')} ${dim(`Pre-${tool}`)}`);
-          }
+          console.log(` ${time}  ${dim('⏳')} ${dim(`Pre-${tool}`)}  ${stats}`);
         } else if (type === 'permission_request') {
           const tool = evt.toolName as string || '?';
-          console.log(` ${time}  ${yellow('🔒')} ${yellow('Permission requested')} ${dim(tool)}`);
+          console.log(` ${time}  ${yellow('🔒')} ${yellow('Permission requested')} ${dim(tool)}  ${stats}`);
         } else if (type === 'notification') {
           const nType = evt.notificationType as string || 'unknown';
           const nMsg = ((evt.notificationMessage as string) || '').slice(0, 80);
-          console.log(` ${time}  ${yellow('🔔')} ${dim('Notification')} ${dim(`[${nType}]`)} ${dim(nMsg)}`);
+          console.log(` ${time}  ${yellow('🔔')} ${dim('Notification')} ${dim(`[${nType}]`)} ${dim(nMsg)}  ${stats}`);
         } else if (type === 'subagent_start') {
           const agentType = evt.agentType as string || '?';
-          console.log(` ${time}  ${green('⊕')} ${bold('Subagent started')} ${cyan(agentType)}`);
+          console.log(` ${time}  ${green('⊕')} ${bold('Subagent started')} ${cyan(agentType)}  ${stats}`);
         } else if (type === 'subagent_stop') {
           const agentType = evt.agentType as string || '?';
-          console.log(` ${time}  ${red('⊖')} ${dim('Subagent stopped')} ${cyan(agentType)}`);
+          console.log(` ${time}  ${red('⊖')} ${dim('Subagent stopped')} ${cyan(agentType)}  ${stats}`);
         } else if (type === 'teammate_idle') {
           const teammate = evt.teammateName as string || '?';
-          console.log(` ${time}  ${dim('💤')} ${dim(`Teammate idle: ${teammate}`)}`);
+          console.log(` ${time}  ${dim('💤')} ${dim(`Teammate idle: ${teammate}`)}  ${stats}`);
         } else if (type === 'task_completed') {
           const subject = evt.taskSubject as string || '?';
-          console.log(` ${time}  ${green('✓')} ${bold('Task completed')} ${dim(subject)}`);
+          console.log(` ${time}  ${green('✓')} ${bold('Task completed')} ${dim(subject)}  ${stats}`);
         } else {
-          console.log(` ${time}  ${dim('·')} ${dim(type)}`);
+          console.log(` ${time}  ${dim('·')} ${dim(type)}  ${stats}`);
           if (debugMode) {
             console.log(dim(`         ${JSON.stringify(evt, null, 2).split('\n').join('\n         ')}`));
           }
