@@ -845,13 +845,13 @@ async function main() {
 
       let runningTokens = serverUsage.totalTokens;
       let runningCost = serverUsage.totalCost;
-      const runningModel = modelInfo || dim('unknown');
       // Latest context window usage from transcript
       let latestContextUsage: { inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number } | null = null;
 
       const fmtRunning = () => {
         // Context bar from real transcript data
         const ctxBar = formatContextBar(latestContextUsage, contextWindowSize);
+        const runningModel = modelInfo || dim('unknown');
         const costPart = dim(`[${runningModel} │ $${runningCost.toFixed(2)}]`);
         if (ctxBar) {
           const colorFn = ctxBar.color === 'red' ? red : ctxBar.color === 'yellow' ? yellow : green;
