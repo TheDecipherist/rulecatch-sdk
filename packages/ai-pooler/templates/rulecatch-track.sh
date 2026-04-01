@@ -738,7 +738,11 @@ CTX_INPUT_TOKENS=0
 CTX_OUTPUT_TOKENS=0
 CTX_CACHE_CREATION=0
 CTX_CACHE_READ=0
+# Derive context window from model (opus 4.6 = 1M, others = 200K)
 CTX_WINDOW_SIZE=200000
+if echo "$INC_MODEL" | grep -qi 'opus'; then
+  CTX_WINDOW_SIZE=1000000
+fi
 
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   # Read last 20 lines, find most recent assistant message with usage

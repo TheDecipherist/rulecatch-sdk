@@ -56,11 +56,11 @@ export function parseTranscriptUsage(transcriptPath: string): TranscriptUsage | 
 
 /**
  * Get context window size for a given model name.
- * All current Claude models use 200K. Extensible for future models.
+ * Opus 4.6 has 1M context, Sonnet/Haiku have 200K.
  */
 export function getContextWindowSize(model: string): number {
   const m = (model || '').toLowerCase();
-  if (m.includes('opus')) return 200000;
+  if (m.includes('opus')) return 1000000;
   if (m.includes('sonnet')) return 200000;
   if (m.includes('haiku')) return 200000;
   return 200000; // default
